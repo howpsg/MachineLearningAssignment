@@ -1,0 +1,187 @@
+---
+title: "Practical Machine Learning - Writeup Project"
+output: html_document
+---
+
+## Executive Summary
+Human Activity Recognition (HAR) is gaining momentum from individuals who want to use the information gathered to track exercise activity, among other reasons. 
+
+For further research, data was collected on 6 individuals who performed various weight lifting exercises with accelerometers located on the individual in specific locations. 
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. 
+
+These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data Processing
+
+The training dataset for this project refer here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test dataset for this project refer here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Download the dataset and read the csv file.
+```{r}
+setInternet2(TRUE)
+
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+
+pmltrain <- read.csv('pml-training.csv')
+
+pmltest <- read.csv('pml-testing.csv')
+```
+
+## Exploratory Data Analysis
+
+Create training, test and validation datasets
+
+```{r}
+library(caret)
+library(ggplot2)
+library(lattice)
+library(kernlab)
+library(randomForest)
+
+# str(pmltrain)
+# str(pmltest)
+```
+
+
+```{r}
+trainidx <- createDataPartition(pmltrain$classe,p=.9,list=FALSE)
+
+traindata = pmltrain[trainidx,]
+testdata = pmltrain[-trainidx,]
+
+set.seed(32768)
+
+nzvar <- nearZeroVar(traindata)
+
+trainnzvar <- traindata[-nzvar]
+testnzvar <- testdata[-nzvar]
+
+pmltestnzvar <- pmltest[-nzvar]
+```
+
+```{r}
+dim(trainnzvar)
+```
+
+```{r}
+dim(testnzvar)
+```{r}
+
+```{r}
+dim(pmltestnzvar)
+```
+
+```{r}
+ftridx <- which(lapply(trainnzvar,class) %in% c('numeric'))
+trainnzvar1 <- preProcess(trainnzvar[,ftridx], method=c('knnImpute'))
+ftridx
+```
+
+```{r}
+trainnzvar1
+```
+
+```{r}
+pred1 <- predict(trainnzvar1, trainnzvar[,ftridx])
+
+predtrain <- cbind(trainnzvar$classe,pred1)
+
+names(predtrain)[1] <- 'classe'
+
+predtrain[is.na(predtrain)] <- 0
+```
+
+```{r}
+pred2 <- predict(trainnzvar1, testnzvar[,ftridx])
+
+predtest <- cbind(testnzvar$classe, pred2)
+
+names(predtest)[1] <- 'classe'
+
+predtest[is.na(predtest)] <- 0
+```
+
+```{r}
+predpmltest <- predict(trainnzvar1,pmltestnzvar[,ftridx] )
+```
+
+```{r}
+dim(predtrain)
+```
+
+```{r}
+dim(predtest)
+```
+
+```{r}
+dim(predpmltest)
+```
+
+## Modeling Analysis
+```{r}
+#mod1 <- train(classe ~ ., method="glm",data=predtrain)
+#mod2 <- train(classe ~ ., method="rf",data=predtrain,trControl=trainControl(method="cv"),number=3)
+#mod1 <- glm(classe ~ .,predtrain)
+#mod1 <- glm.fit(classe ~ .,predtrain)
+
+model <- randomForest(classe~.,data=predtrain)
+```
+
+```{r}
+predtrain1 <- predict(model, predtrain) 
+
+print(table(predtrain1, predtrain$classe))
+```
+
+```{r}
+training <- as.data.frame(table(predtrain1, predtrain$classe))
+
+# qplot(training)
+```
+
+```{r}
+predtest1 <- predict(model, predtest) 
+
+print(table(predtest1, predtest$classe))
+
+# qplot(table(predtest1, predtest$classe))
+
+```
+
+```{r}
+str(predpmltest)
+```
+
+```{r}
+predanswers <- predict(model, predpmltest) 
+
+predanswers
+```
+
+## Results
+```{r}
+predanswers <- predict(model, predpmltest) 
+
+predanswers
+```
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(as.character(predanswers))
+```
